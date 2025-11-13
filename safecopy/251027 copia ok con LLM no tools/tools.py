@@ -1,0 +1,280 @@
+# """
+# What Are Tools?
+# Tools are methods (functions) provided to the model (or to an agent), making them available 
+# for use when the agent needs to perform actions such as collecting data from the internet, 
+# making calculations, retrieving emails from a mailbox, and more. Since the main goal is to 
+# make agents increasingly autonomous, we cannot respond to every concern an agent may have. 
+ 
+# Instead, we aim to equip the agent with tools they can use independently.
+# Let's explore how to build such tools and how to utilize tools that are integrated into external 
+# Python libraries like Ollama and OpenAI.
+# """
+
+try:
+    from cohere import Tool  # optional
+except Exception:
+    Tool = None
+
+import httpx
+import calendar
+import datetime
+import importlib
+import traceback
+from typing import Callable
+
+try:
+    from langchain_community.tools import WikipediaQueryRun
+    from langchain_community.utilities import WikipediaAPIWrapper
+except Exception:
+    WikipediaQueryRun = None
+    WikipediaAPIWrapper = None
+
+
+registered_functions = {}
+
+def register_function(func) -> Callable:
+    registered_functions[func.__name__] = func
+    return func
+
+
+def run_callable(name: str, arguments: dict) -> Callable | dict:
+    try:
+        # Prefer the registered_functions dictionary defined in this module.
+        func = registered_functions.get(name)
+
+        if callable(func):
+            return func(**arguments)
+        else:
+            return {"error": f"Function '{name}' is not callable or not found"}
+    except Exception as e:
+        traceback.print_exc()
+        return {"error": f"Error executing {name}: {str(e)}"}
+
+
+# ################################################################# 
+# # step 1: create functions & register them globally
+# ################################################################# 
+
+@register_function
+def weather(city: str) -> str:
+    """
+    Use this tool to check updated weather for a given city.
+    Remember to replace diacritics with neutral consotants or vowels, e.g. Kraków -> Krakow You need to provide city name.
+
+    Arguments:
+    city (str): The city name.
+
+    Returns:
+    str: Response containing the weather data for the provided city, or in case of error: a str containint error message.
+    """
+
+    base_url: str = f"http://wttr.in/{city}?format=j1"
+    response = httpx.Client(follow_redirects=True, default_encoding="utf-8").get(base_url)
+    response.raise_for_status()
+
+    if response.status_code == 200:
+        data = response.json()
+        temp = data["current_condition"][0]["temp_C"]
+        return f"The temperature in {city} is {temp} Celsius degree"
+    else:
+        return f"Could not retrieve weather data for {city}."
+
+
+@register_function
+def today_is() -> str:
+    """
+    Use this tool to check today's time and date.
+    Remember to replace diacritics with neutral consotants or vowels, e.g. Kraków -> Krakow You need to provide city name.
+
+    Returns:
+    str: A string representing timestamp made of time and date in format 'YYYY-MM-DD HH:MM:SS'.
+    """
+    return f"The time and date now is: {str(datetime.datetime.now().replace(microsecond=0))}"
+
+
+@register_function
+def day_of_week() -> str:
+    """
+    Use to get name of today's day.
+
+    Arguments:
+    None
+
+    Returns: name of the day of the week for today.
+    """
+    d = datetime.date.today()
+    weekday_index = calendar.weekday(d.year, d.month, d.day)
+    weekday_names = list(calendar.day_name)
+    return str(weekday_names[weekday_index].capitalize())
+
+
+@register_function
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return int(a) + int(b)
+
+@register_function
+def subtract(a: int, b: int) -> int:
+    """Subtract two numbers."""
+    return int(a) - int(b)
+
+@register_function
+def multiply(a: int, b: int) -> int:
+    """Multiply two numbers."""
+    return int(a) * int(b)
+
+@register_function
+def divide(a: int, b: int) -> int:
+    """Divide two numbers."""
+    return int(a) / int(b)
+
+@register_function
+def square(a) -> int:
+    """Calculates the square of a number."""
+    a = int(a)
+    return int(a) * int(a)
+
+@register_function
+def wikipedia_search(query: str) -> str:
+    """Use this tool to search Wikipedia (italiano) for general knowledge."""
+    try:
+        api_wrapper = WikipediaAPIWrapper(language="it")
+        return WikipediaQueryRun(api_wrapper=api_wrapper).run(query)
+    except Exception as e:
+        return f"Error: {e}"
+    
+
+# ################################################################# 
+# step 2: add tools schema so the agent is able to use it
+# ################################################################# 
+
+today_is_tool = {
+    "type": "function",
+    "function": {
+        "name": "today_is",
+        "description": "Get today's date",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+}
+
+weather_tool = {
+    "type": "function",
+    "function": {
+        "name": "weather",
+        "description": "Get current weather for a specific city",
+        "parameters": {
+            "type": "object",
+            "properties": {"city": {"type": "string", "description": "The city name"}},
+            "required": ["city"],
+        },
+    },
+}
+
+day_of_week_tool = {
+    "type": "function",
+    "function": {
+        "name": "day_of_week",
+        "description": "Get today's the day of the week",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+}
+
+add_tool = {
+    "type": "function",
+    "function": {
+        "name": "add",
+        "description": "Add two numbers.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "integer", "description": "The first number to add"},
+                "b": {"type": "integer", "description": "The second number to add"}
+            },
+            "required": ["a", "b"],
+        },
+    },
+}
+
+subtract_tool = {
+    "type": "function",
+    "function": {
+        "name": "subtract",
+        "description": "Subtract two numbers.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "integer", "description": "The first number"},
+                "b": {"type": "integer", "description": "The second number to subtract"}
+            },
+            "required": ["a", "b"],
+        },
+    },
+}
+            
+multiply_tool = {
+    "type": "function",
+    "function": {
+        "name": "multiply",
+        "description": "Multiply two numbers.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "integer", "description": "The first number to multiply"},
+                "b": {"type": "integer", "description": "The second number to multiply"}
+            },
+            "required": ["a", "b"],
+        },
+    },
+}
+
+divide_tool = {
+    "type": "function",
+    "function": {
+        "name": "divide",
+        "description": "Divide two numbers.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "integer", "description": "Dividendo"},
+                "b": {"type": "integer", "description": "Divisore"}
+            },
+            "required": ["a", "b"],
+        },
+    },
+}
+
+square_tool = {
+    "type": "function",
+    "function": {
+        "name": "square",
+        "description": "square of a numbers.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "integer", "description": "The number to square"}
+            },
+            "required": ["a"],
+        },
+    },
+}
+
+wiki_tool = {
+    "type": "function",
+    "function": {
+        "name": "wikipedia",
+        "description": "Get wikipedia info for a specific query",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The user query"}},
+            "required": ["query"],
+        },
+    },
+}

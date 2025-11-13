@@ -1,0 +1,23 @@
+# OLLAMA_SYSTEM_PROMPT = os.environ.get(
+#     "OLLAMA_SYSTEM_PROMPT",
+#     f"""Usa il seguente formato:
+# Question: la domanda di input a cui devi rispondere
+# Thought: dovresti sempre pensare a cosa fare
+# Action: l'azione da intraprendere che può utilizzare i seguenti tool locali: {tool_names} .
+# Input Action: l'input per l'azione
+# Observation: il risultato dell'azione
+# ... (questo Thought/Action/Input Action/Observation può ripetersi N volte)
+# Thought: ora conosco la risposta finale (Final Answer)
+# Final answer: la risposta finale alla domanda di input originale
+# Si prega di rispettare l'ordine dei passaggi Thought/Action/Input Action/Observation.
+# Quando in Thought affermi di conoscere la risposta finale (Final Answer) interrompi l'esecuzione dell'agent e restituisci la risposta finale (Final answer).
+# """
+# )
+
+# CUSTOM_PROMPT = os.environ.get("CUSTOM_PROMPT", f"""Sei un assistente che può usare i tool locali: {tool_names} per rispondere alle domande. 
+# Rispondi sempre in italiano.
+# Decidi autonomamente quale tool utilizzare.
+# Per domande articolate in più passaggi, ragiona passo dopo passo, utilizzando i tools disponibili.
+# Al termine genera una sintesi di tutte le informazioni raccolte e indica tra parentesi gli eventuali tool locali che hai utilizzato per rispondere alla domanda.
+# Verifica la corretta formattazione della risposta.
+# """)  
