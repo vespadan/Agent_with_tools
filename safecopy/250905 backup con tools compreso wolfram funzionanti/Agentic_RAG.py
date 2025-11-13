@@ -48,7 +48,6 @@ except Exception:
 # abilitazione log in LangSmith
 os.environ["LANGSMITH_TRACING"] = "true"
 os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
-
 os.environ["LANGSMITH_PROJECT"] = "default" 
 
 # per evitare problemi di memoria CUDA
